@@ -1135,7 +1135,7 @@ static const struct proc_ops proc_file_fops_FuzzerBench = {
 };
 static const struct proc_ops proc_file_fops_FuzzerBenchCycleByCycle = {
     .proc_lseek = seq_lseek,
-    .proc_open = open_FuzerBenchCycleByCycle,
+    .proc_open = open_FuzzerBenchCycleByCycle,
     .proc_read = seq_read,
     .proc_release = single_release,
 };
