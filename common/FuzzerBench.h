@@ -78,7 +78,7 @@
 
 // How often the measurement will be repeated.
 extern long n_measurements;
-#define N_MEASUREMENTS_DEFAULT 10;
+#define N_MEASUREMENTS_DEFAULT 1;
 
 // How often the code to be measured will be unrolled.
 extern long unroll_count;

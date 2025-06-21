@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 
-# prev_working_dir=$(pwd)
-# if [ "$prev_working_dir" != "/home/doit_prj/proj/nanoBench" ]; then
-#     cd "/home/doit_prj/proj/nanoBench"
-# fi
+prev_working_dir=$(pwd)
+if [ "$prev_working_dir" != "FuzzBench" ]; then
+    cd "FuzzBench" 
+fi
 
 source utils.sh
 
 if [ "$EUID" -ne 0 ]; then
-    echo "Error: FuzzerBench requires root privileges" >&2
-    echo "Try \"sudo ./kernel-FuzzerBench.sh ...\"" >&2
+    echo "Error: requires root privileges" >&2
+    echo "Try \"sudo ./init_params.sh ...\"" >&2
     exit 1
 fi
 
 if [ ! -e /sys/FuzzerBench ]; then
     echo "Error: FuzzerBench kernel module not loaded" >&2
-    echo "Load with \"sudo insmod kernel/FuzzerBench.ko\"" >&2
+    echo "Load with \"sudo insmod kernel/FuzzerBench_km.ko\"" >&2
     exit 1
 fi
 
@@ -141,7 +141,7 @@ while [ "$1" ]; do
         filter_output="grep -v 0.00"
         shift
     elif [[ "$1" == -h* ]]; then
-        echo "kernel-FuzzerBench.sh usage:"
+        echo "init_params.sh usage:"
         echo
         echo "  -asm <code>:                    Assembler code string (in Intel syntax) to be benchmarked."
         echo "  -asm_init <code>:               Assembler code string (in Intel syntax) to be executed once in the beginning."
@@ -180,6 +180,6 @@ while [ "$1" ]; do
     fi
 done
 
-# cd $prev_working_dir
+cd $prev_working_dir
 
 exit $return_value
