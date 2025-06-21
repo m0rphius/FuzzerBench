@@ -27,5 +27,6 @@ FuzzerBench enables users to:
 ### Build and Insert
 
 ```bash
+# Inside the root directory
 make
-sudo insmod nb_km.ko
+sudo insmod kernel/FuzzerBench.ko
