@@ -1,6 +1,15 @@
 # Based on https://download.01.org/perfmon/ADL/alderlake_gracemont_core_v1.04.json
 # Applies to processors with family-model in {6-97, 6-9A}
 
+# Counts the number of unhalted core clock cycles.
+3C.00 CPU_CLK_UNHALTED.CORE_P
+
+# Counts the number of unhalted core clock cycles.
+3C.00 CPU_CLK_UNHALTED.THREAD_P
+
+# Counts the total number of issue slots every cycle that were not consumed by the backend due to backend stalls.
+74.00 TOPDOWN_BE_BOUND.ALL
+
 # Counts the number of retired loads that are blocked because its address exactly matches an older store whose data is not ready.
 03.01 LD_BLOCKS.DATA_UNKNOWN
 
@@ -64,12 +73,6 @@
 # Counts the number of cycles the core is stalled due to an instruction cache or tlb miss which hit in the L2, LLC, DRAM or MMIO (Non-DRAM).
 34.38 MEM_BOUND_STALLS.IFETCH
 
-# Counts the number of unhalted core clock cycles.
-3C.00 CPU_CLK_UNHALTED.CORE_P
-
-# Counts the number of unhalted core clock cycles.
-3C.00 CPU_CLK_UNHALTED.THREAD_P
-
 # Counts the number of page walks completed due to store DTLB misses to any page size.
 49.0E DTLB_STORE_MISSES.WALK_COMPLETED
 
@@ -120,9 +123,6 @@
 
 # Counts the number of issue slots every cycle that were not consumed by the backend due to branch mispredicts.
 73.04 TOPDOWN_BAD_SPECULATION.MISPREDICT
-
-# Counts the total number of issue slots every cycle that were not consumed by the backend due to backend stalls.
-74.00 TOPDOWN_BE_BOUND.ALL
 
 # Counts the number of issue slots every cycle that were not consumed by the backend due to certain allocation restrictions.
 74.01 TOPDOWN_BE_BOUND.ALLOC_RESTRICTIONS

@@ -787,6 +787,10 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
     kernel_fpu_begin();
     disable_interrupts_preemption();
 
+    long base_unroll_count = (basic_mode?0:unroll_count);
+    long main_unroll_count = (basic_mode?unroll_count:2*unroll_count);
+    long base_loop_count = (basic_mode?0:loop_count);
+    long main_loop_count = loop_count;
 
     clear_perf_counter_configurations();
     clear_perf_counters();
@@ -865,7 +869,7 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
                         int64_t result = normalize(agg-agg_base);
                         if (offset < MAX_LINE_LEN - 32) {  // Leave room for result
                             int len = scnprintf(buf_ptr + offset, MAX_LINE_LEN - offset,
-                                                " %lld.%.2lld", ll_abs(result/100), ll_abs(result%100));
+                                                " %lld", ll_abs(result));
                             buf_ptr[offset + len] = '\0';
                             offset += len;
                         }

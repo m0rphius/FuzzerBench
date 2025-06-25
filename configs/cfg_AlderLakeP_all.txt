@@ -1,6 +1,9 @@
 # Based on https://download.01.org/perfmon/ADL/alderlake_goldencove_core_v1.04.json
 # Applies to processors with family-model in {6-97, 6-9A}
 
+# TBD
+28.02 CORE_POWER.LICENSE_1
+
 # False dependencies in MOB due to partial compare on address.
 03.04 LD_BLOCKS.ADDRESS_ALIAS
 
@@ -135,9 +138,6 @@
 
 # L2 cache lines filling L2
 25.1F L2_LINES_IN.ALL
-
-# TBD
-28.02 CORE_POWER.LICENSE_1
 
 # TBD
 28.04 CORE_POWER.LICENSE_2

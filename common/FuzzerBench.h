@@ -82,7 +82,7 @@ extern long n_measurements;
 
 // How often the code to be measured will be unrolled.
 extern long unroll_count;
-#define UNROLL_COUNT_DEFAULT 100;
+#define UNROLL_COUNT_DEFAULT 1;
 
 // Number of iterations of the inner loop. Setting this to 0 will disable the inner loop; the code to be measured is then executed unroll_count many times.
 extern long loop_count;
@@ -112,14 +112,14 @@ extern int no_mem;
 
 // If enabled, the measurement results are not divided by the number of repetitions.
 extern int no_normalization;
-#define NO_NORMALIZATION_DEFAULT false;
+#define NO_NORMALIZATION_DEFAULT true;
 
 // If disabled, the first measurement is performed with 2*unroll_count and the second with unroll_count; the reported result is the difference between the two
 // measurements.
 // If enabled, the first measurement is performed with unroll_count and the second with an empty measurement body; the reported result is the difference
 // between the two measurements.
 extern int basic_mode;
-#define BASIC_MODE_DEFAULT false;
+#define BASIC_MODE_DEFAULT true;
 
 // If enabled, the result includes measurements using the fixed-function performance counters and the RDTSC instruction.
 extern int use_fixed_counters;

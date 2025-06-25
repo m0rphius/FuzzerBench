@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 prev_working_dir=$(pwd)
-if [ "$prev_working_dir" != "FuzzBench" ]; then
-    cd "FuzzBench" 
+if [ "$prev_working_dir" != "FuzzerBench" ]; then
+    cd "FuzzerBench" 
 fi
 
 source utils.sh
