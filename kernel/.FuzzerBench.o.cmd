@@ -1,0 +1,1 @@
+savedcmd_/home/doit_prj/proj/PERFuzzer/FuzzerBench/kernel/FuzzerBench.o := ld -m elf_x86_64 -z noexecstack --no-warn-rwx-segments   -r -o /home/doit_prj/proj/PERFuzzer/FuzzerBench/kernel/FuzzerBench.o @/home/doit_prj/proj/PERFuzzer/FuzzerBench/kernel/FuzzerBench.mod 

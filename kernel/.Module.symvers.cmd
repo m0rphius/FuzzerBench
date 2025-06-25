@@ -1,0 +1,1 @@
+savedcmd_/home/doit_prj/proj/PERFuzzer/FuzzerBench/kernel/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/doit_prj/proj/PERFuzzer/FuzzerBench/kernel/Module.symvers -T /home/doit_prj/proj/PERFuzzer/FuzzerBench/kernel/modules.order -i Module.symvers -e 
