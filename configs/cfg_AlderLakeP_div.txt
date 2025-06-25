@@ -1,0 +1,8 @@
+# Based on https://download.01.org/perfmon/ADL/alderlake_gracemont_core_v1.04.json
+# Applies to processors with family-model in {6-97, 6-9A}
+
+3C.00 CPU_CLK_UNHALTED.THREAD_P
+B0.09.CMSK=1 ARITH.DIV_ACTIVE
+AE.01 UOPS_ISSUED.ANY
+C2.04.TakenAlone UOPS_RETIRED.MS
+A4.04.CTR=0 TOPDOWN.BAD_SPEC_SLOTS
