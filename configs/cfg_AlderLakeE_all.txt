@@ -1,6 +1,9 @@
 # Based on https://download.01.org/perfmon/ADL/alderlake_gracemont_core_v1.04.json
 # Applies to processors with family-model in {6-97, 6-9A}
 
+# Counts the number of issue slots every cycle that were not delivered by the frontend due to decode stalls.
+71.08 TOPDOWN_FE_BOUND.DECODE
+
 # Counts the number of unhalted core clock cycles.
 3C.00 CPU_CLK_UNHALTED.CORE_P
 
@@ -87,9 +90,6 @@
 
 # Counts the number of issue slots every cycle that were not delivered by the frontend due to wrong predecodes.
 71.04 TOPDOWN_FE_BOUND.PREDECODE
-
-# Counts the number of issue slots every cycle that were not delivered by the frontend due to decode stalls.
-71.08 TOPDOWN_FE_BOUND.DECODE
 
 # Counts the number of issue slots every cycle that were not delivered by the frontend due to ITLB misses.
 71.10 TOPDOWN_FE_BOUND.ITLB

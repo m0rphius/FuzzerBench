@@ -815,22 +815,20 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
     // Inject the constant register inputs
     int32_t *regs = (int32_t *)inputs_buffer;
 
-    size_t offsetI = 0x3D;
-    for (int i=0; i < NUM_CONSTANT_REGS; i++){
-        *(int32_t *)(&runtime_code_base[offsetI + i*7 + 3]) = regs[i];
-        *(int32_t *)(&runtime_code_main[offsetI + i*7 + 3]) = regs[i];
-    }
-
-    int32_t* changing_regs = regs + NUM_CONSTANT_REGS;
-
     // Repeat experiment n_inputs times
     for (int inp = 0; inp < warm_up_count + num_inputs; inp++){
         // Inject the changing register inputs 
-        int group_ind = n_rep*(num_inputs + warm_up_count)*NUM_CHANGING_REGS + inp*NUM_CHANGING_REGS;
-        offsetI = 0x21;
-        for (int i=0; i < NUM_CHANGING_REGS; i++){
-            *(int32_t *)(&runtime_code_base[offsetI + i*7 + 3]) = changing_regs[group_ind + i];
-            *(int32_t *)(&runtime_code_main[offsetI + i*7 + 3]) = changing_regs[group_ind + i];
+        int group_ind = n_rep*(num_inputs + warm_up_count)*(NUM_VAR_REGS + NUM_MEM_REGS) + inp*(NUM_VAR_REGS + NUM_MEM_REGS);
+        size_t offsetI = 0x21;
+        for (int i=0; i < NUM_VAR_REGS; i++){
+            *(int32_t *)(&runtime_code_base[offsetI + i*7 + 3]) = regs[group_ind + i];
+            *(int32_t *)(&runtime_code_main[offsetI + i*7 + 3]) = regs[group_ind + i];
+        }
+
+        offsetI = 0x3D;
+        for (int i=0; i < NUM_MEM_REGS; i++){
+            *(int32_t *)(&runtime_code_base[offsetI + i*7 + 3]) = regs[group_ind + NUM_VAR_REGS + i];
+            *(int32_t *)(&runtime_code_main[offsetI + i*7 + 3]) = regs[group_ind + NUM_VAR_REGS + i];
         }
         
         // Put all inputs (for debugging)

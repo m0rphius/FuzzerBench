@@ -162,11 +162,11 @@ extern int cpu;
 
 // Number of registers that change values between input groups.
 // (rax, rbx, rcx, rdx)
-#define NUM_CHANGING_REGS 4
+#define NUM_VAR_REGS 4
 
 // Number of registers that are constant between input groups.
 // (r8, r9, r10, r11, r12, r13)
-#define NUM_CONSTANT_REGS 6
+#define NUM_MEM_REGS 6
 
 // Maximum number of PFC configurations that can be parsed.
 #define MAX_PFC_CONFIGS 64
