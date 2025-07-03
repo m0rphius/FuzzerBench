@@ -2,7 +2,7 @@
 # Applies to processors with family-model in {6-97, 6-9A}
 
 # TBD
-28.02 CORE_POWER.LICENSE_1
+#28.02 CORE_POWER.LICENSE_1
 
 # False dependencies in MOB due to partial compare on address.
 03.04 LD_BLOCKS.ADDRESS_ALIAS
@@ -140,10 +140,10 @@
 25.1F L2_LINES_IN.ALL
 
 # TBD
-28.04 CORE_POWER.LICENSE_2
+#28.04 CORE_POWER.LICENSE_2
 
 # TBD
-28.08 CORE_POWER.LICENSE_3
+#28.08 CORE_POWER.LICENSE_3
 
 # Counts demand data reads that have any type of response.
 2A.01.MSR_RSP0=0x10001.TakenAlone OCR.DEMAND_DATA_RD.ANY_RESPONSE
