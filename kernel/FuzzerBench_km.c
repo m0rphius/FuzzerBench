@@ -20,6 +20,10 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 
+#include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/string.h>
+
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(4,12,0)
 #include <asm/cacheflush.h>
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
@@ -66,6 +70,7 @@ unsigned long kallsyms_lookup_name(const char* name) {
 
 // 4 Mb is the maximum that kmalloc supports on my machines
 #define KMALLOC_MAX (4*1024*1024)
+#define PAGE_SIZE 4096
 
 // If enabled, for cycle-by-cycle measurements, the output includes all of the measurement overhead; otherwise, only the cycles between adding the first
 // instruction of the benchmark to the IDQ, and retiring the last instruction of the benchmark are considered.
@@ -95,6 +100,8 @@ size_t n_r14_segments = 0;
 bool trace_ready = false;
 char inputs_buffer[4*1024*1024];
 static size_t inputs_size = 0;
+static size_t mem_size = 0;
+char mem_region[2*PAGE_SIZE];
 int n_rep = 0;
 
 static char trace[MAX_INPUTS][MAX_LINE_LEN];
@@ -666,6 +673,37 @@ static struct bin_attribute trace_bin_attribute = {
     .read = trace_read,
 };
 
+static ssize_t mem_read(struct file* file, struct kobject *kobj, struct bin_attribute *attr, 
+                    char *buf, loff_t pos, size_t count){   
+    if (pos >= mem_size)
+        return 0;
+    
+    if (pos + count > mem_size)
+        count = mem_size - pos;
+    
+    memcpy(buf, mem_region + pos, count);
+    return count;
+}
+
+static ssize_t mem_write(struct file* file, struct kobject *kobj, struct bin_attribute *attr, 
+                     char *buf, loff_t pos, size_t count){ 
+    if (pos + count > PAGE_SIZE * 2){
+        return -ENOSPC;
+    }
+
+    memcpy(mem_region + pos, buf, count);
+    mem_size = max(mem_size, pos + count);
+
+    return count;
+}
+
+static struct bin_attribute mem_bin_attribute = {
+    .attr = {.name = "mem", .mode=0666 }, 
+    .size = PAGE_SIZE * 2, 
+    .read = mem_read,
+    .write = mem_write,
+};
+
 // [ADDED] to control the core on which the experiment is executed
 static ssize_t cpu_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
     return sprintf(buf, "%d\n", cpu);
@@ -791,7 +829,7 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
     long main_unroll_count = (basic_mode?unroll_count:2*unroll_count);
     long base_loop_count = (basic_mode?0:loop_count);
     long main_loop_count = loop_count;
-
+    
     clear_perf_counter_configurations();
     clear_perf_counters();
     clear_overflow_status_bits();
@@ -815,6 +853,7 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
     // Inject the constant register inputs
     int32_t *regs = (int32_t *)inputs_buffer;
 
+
     // Repeat experiment n_inputs times
     for (int inp = 0; inp < warm_up_count + num_inputs; inp++){
         // Inject the changing register inputs 
@@ -831,11 +870,22 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
             *(int32_t *)(&runtime_code_main[offsetI + i*7 + 3]) = regs[group_ind + NUM_VAR_REGS + i];
         }
         
-        // Put all inputs (for debugging)
-        // int len = scnprintf(buf_ptr, MAX_LINE_LEN, "[%d,%d,%d,%d,%d,%d,%d,%d]\n", regs[0], regs[1], regs[2], regs[3], 
-        // changing_regs[group_ind], changing_regs[group_ind+1], changing_regs[group_ind+2], changing_regs[group_ind+3]);
-        // size_t offset = len;
-        // buf_ptr[offset] = '\0';
+        // struct file *filp;
+        // loff_t pos = 0;
+        // char *data = runtime_code_main;
+        // size_t len1 = 1000;
+
+        // filp = filp_open("/home/doit_prj/proj/PERFuzzer/runtime.bin", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        // if (IS_ERR(filp)) {
+        //     pr_err("Failed to open file: %ld\n", PTR_ERR(filp));
+        //     return PTR_ERR(filp);
+        // }
+
+        // // Use kernel_write() safely — no set_fs needed
+        // kernel_write(filp, data, len1, &pos);
+
+        // filp_close(filp, NULL);
+
 
         // Values for writing measurement results
         
@@ -851,11 +901,12 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
 
         size_t next_pfc_config = 0;
         while (next_pfc_config < n_pfc_configs) {
-            run_initial_warmup_experiment();
+            // run_initial_warmup_experiment();
             char* pfc_descriptions[MAX_PROGRAMMABLE_COUNTERS] = {0};
             next_pfc_config = configure_perf_ctrs_programmable(next_pfc_config, true, true, n_used_counters, 0, pfc_descriptions);
             // on some microarchitectures (e.g., Broadwell), some events (e.g., L1 misses) are not counted properly if only the OS field is set
-            
+            // Set memory
+            memcpy(runtime_r14, mem_region, PAGE_SIZE * 2);
             run_inputted_experiment(measurement_results_base, n_used_counters, true);
             run_inputted_experiment(measurement_results, n_used_counters, false);
             
@@ -1266,6 +1317,7 @@ static int __init fuzzerBench_init(void) {
     error |= sysfs_create_file(fuzzerBench_kobj, &cpu_attribute.attr);
     error |= sysfs_create_bin_file(fuzzerBench_kobj, &trace_bin_attribute);
     error |= sysfs_create_bin_file(fuzzerBench_kobj, &inputs_bin_attribute);
+    error |= sysfs_create_bin_file(fuzzerBench_kobj, &mem_bin_attribute);
 
     if (error) {
         pr_err("failed to create file in /sys/FuzzerBench/\n");
