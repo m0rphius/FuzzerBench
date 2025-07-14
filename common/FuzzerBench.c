@@ -62,6 +62,7 @@ void* runtime_rbp;
 void* runtime_rdi;
 void* runtime_rsi;
 void* runtime_rsp;
+void* dummy_addr;
 int64_t pfc_mem[MAX_PROGRAMMABLE_COUNTERS];
 void* RSP_mem;
 
@@ -789,6 +790,11 @@ void run_experiment(char* measurement_template, int64_t* results[], int n_counte
 void run_inputted_experiment(int64_t *results[], int n_counters, bool base) {
     char *run_code = base ? runtime_code_base : runtime_code_main;
     
+    // #ifdef __KERNEL__
+    // if (base){
+    //     ENABLE_MWAIT(mwait_memory_area + MWAIT_MEMORY_OFFSET);
+    // }
+    // #endif
     ((void(*)(void))run_code)();
 
     for (int c=0; c<n_counters; c++) {

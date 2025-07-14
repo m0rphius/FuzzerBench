@@ -3,6 +3,7 @@
 #include <asm/apic.h>
 #include <asm-generic/io.h>
 #include <asm/mem_encrypt.h>
+#include <asm/mwait.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
@@ -71,6 +72,28 @@ unsigned long kallsyms_lookup_name(const char* name) {
 // 4 Mb is the maximum that kmalloc supports on my machines
 #define KMALLOC_MAX (4*1024*1024)
 #define PAGE_SIZE 4096
+#define MWAIT_MEMORY_OFFSET (64 * 21)
+ __attribute__((aligned(4096))) char mwait_memory_area[4096 * 32];
+
+#define ENABLE_MWAIT(monitored_addr)\
+{\
+uint64_t a, d; \
+uint64_t offset = 500000; \
+asm volatile("movq %0, %%rdi\n\t" \
+"movq %%rdi, %%rax\n\t" \
+"movq $0, %%rcx\n\t" \
+"movq $0, %%rdx\n\t" \
+"monitor\n\t" \
+: \
+: "r"(monitored_addr) \
+: "rax", "rdi", "rcx", "rdx", "memory");\
+asm volatile("mfence");\
+asm volatile("rdtscp" : "=a"(a), "=d"(d) :: "rcx");\
+a = (d << 32) | a; \
+asm volatile("mfence");\
+uint64_t wakeup = a + offset;\
+asm volatile("mwait" :: "a"(0x60), "b"(wakeup & 0xffffffff), "d"((wakeup >> 32)), "c"(2));\
+}
 
 // If enabled, for cycle-by-cycle measurements, the output includes all of the measurement overhead; otherwise, only the cycles between adding the first
 // instruction of the benchmark to the IDQ, and retiring the last instruction of the benchmark are considered.
@@ -508,6 +531,7 @@ static ssize_t addresses_show(struct kobject *kobj, struct kobj_attribute *attr,
     count += sprintf(&(buf[count]), "RSI: 0x%px\n", runtime_rsi);
     count += sprintf(&(buf[count]), "RBP: 0x%px\n", runtime_rbp);
     count += sprintf(&(buf[count]), "RSP: 0x%px\n", runtime_rsp);
+    count += sprintf(&(buf[count]), "DUMMY: 0x%px\n", dummy_addr);
     return count;
 }
 static ssize_t addresses_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
@@ -821,10 +845,10 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
     cpumask_clear(&mask);
     cpumask_set_cpu(cpu, &mask);
     set_cpus_allowed_ptr(task, &mask);
-
+    
     kernel_fpu_begin();
     disable_interrupts_preemption();
-
+    
     long base_unroll_count = (basic_mode?0:unroll_count);
     long main_unroll_count = (basic_mode?unroll_count:2*unroll_count);
     long base_loop_count = (basic_mode?0:loop_count);
@@ -842,18 +866,19 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
     int n_used_counters = n_programmable_counters;
     if (n_used_counters >= 4) {
         n_used_counters = 4;
-
+        
     } else {
         n_used_counters = 2;
-    
+        
     }
-
+    
     // Prepare inputs for the benchmark code (num_inputs groups of random values to rax, rbx, rcx, rdx)
     // The benchmark code will use these values as inputs for the benchmark code
     // Inject the constant register inputs
     int32_t *regs = (int32_t *)inputs_buffer;
-
-
+    
+    
+    ENABLE_MWAIT(mwait_memory_area + MWAIT_MEMORY_OFFSET);
     // Repeat experiment n_inputs times
     for (int inp = 0; inp < warm_up_count + num_inputs; inp++){
         // Inject the changing register inputs 
@@ -863,7 +888,7 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
             *(int32_t *)(&runtime_code_base[offsetI + i*7 + 3]) = regs[group_ind + i];
             *(int32_t *)(&runtime_code_main[offsetI + i*7 + 3]) = regs[group_ind + i];
         }
-
+        
         offsetI = 0x3D;
         for (int i=0; i < NUM_MEM_REGS; i++){
             *(int32_t *)(&runtime_code_base[offsetI + i*7 + 3]) = regs[group_ind + NUM_VAR_REGS + i];
@@ -874,20 +899,20 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
         // loff_t pos = 0;
         // char *data = runtime_code_main;
         // size_t len1 = 1000;
-
+        
         // filp = filp_open("/home/doit_prj/proj/PERFuzzer/runtime.bin", O_WRONLY | O_CREAT | O_TRUNC, 0644);
         // if (IS_ERR(filp)) {
-        //     pr_err("Failed to open file: %ld\n", PTR_ERR(filp));
-        //     return PTR_ERR(filp);
-        // }
+            //     pr_err("Failed to open file: %ld\n", PTR_ERR(filp));
+            //     return PTR_ERR(filp);
+            // }
 
-        // // Use kernel_write() safely — no set_fs needed
-        // kernel_write(filp, data, len1, &pos);
+            // // Use kernel_write() safely — no set_fs needed
+            // kernel_write(filp, data, len1, &pos);
+            
+            // filp_close(filp, NULL);
+            
 
-        // filp_close(filp, NULL);
-
-
-        // Values for writing measurement results
+            // Values for writing measurement results
         
         char *buf_ptr;
         int len; size_t offset;
@@ -898,10 +923,11 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
             buf_ptr[offset] = '\0';
         } 
         
-
+        
         size_t next_pfc_config = 0;
         while (next_pfc_config < n_pfc_configs) {
             // run_initial_warmup_experiment();
+            
             char* pfc_descriptions[MAX_PROGRAMMABLE_COUNTERS] = {0};
             next_pfc_config = configure_perf_ctrs_programmable(next_pfc_config, true, true, n_used_counters, 0, pfc_descriptions);
             // on some microarchitectures (e.g., Broadwell), some events (e.g., L1 misses) are not counted properly if only the OS field is set
@@ -1241,6 +1267,7 @@ static int __init fuzzerBench_init(void) {
     runtime_rdi = vmalloc(RUNTIME_R_SIZE);
     runtime_rsi = vmalloc(RUNTIME_R_SIZE);
     runtime_rsp = vmalloc(RUNTIME_R_SIZE);
+    dummy_addr = vmalloc(RUNTIME_R_SIZE);
     if (!runtime_r14 || !runtime_rbp || !runtime_rdi || !runtime_rsi || !runtime_rsp) {
         pr_err("Could not allocate memory for runtime_r*\n");
         return -1;
@@ -1250,11 +1277,13 @@ static int __init fuzzerBench_init(void) {
     memset(runtime_rdi, 0, RUNTIME_R_SIZE);
     memset(runtime_rsi, 0, RUNTIME_R_SIZE);
     memset(runtime_rsp, 0, RUNTIME_R_SIZE);
+    memset(dummy_addr, 0, RUNTIME_R_SIZE);
     runtime_r14 += RUNTIME_R_SIZE/2;
     runtime_rbp += RUNTIME_R_SIZE/2;
     runtime_rdi += RUNTIME_R_SIZE/2;
     runtime_rsi += RUNTIME_R_SIZE/2;
     runtime_rsp += RUNTIME_R_SIZE/2;
+    dummy_addr += RUNTIME_R_SIZE/2;
 
     runtime_code_baseK = kmalloc(KMALLOC_MAX, GFP_KERNEL);
     if (!runtime_code_baseK) {
