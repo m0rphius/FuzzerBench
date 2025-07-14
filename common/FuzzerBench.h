@@ -171,7 +171,7 @@ extern int cpu;
 // Maximum number of PFC configurations that can be parsed.
 #define MAX_PFC_CONFIGS 64
 
-#define MAX_INPUTS 500 
+#define MAX_INPUTS 500
 #define MAX_LINE_LEN 1024*2
 
 extern char* code;

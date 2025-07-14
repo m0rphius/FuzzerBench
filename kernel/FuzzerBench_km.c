@@ -95,6 +95,12 @@ uint64_t wakeup = a + offset;\
 asm volatile("mwait" :: "a"(0x60), "b"(wakeup & 0xffffffff), "d"((wakeup >> 32)), "c"(2));\
 }
 
+#define SAFE_FREE(x)                                                                               \
+if (x) {                                                                                       \
+    vfree(x);                                                                                  \
+    x = NULL;                                                                                  \
+}
+
 // If enabled, for cycle-by-cycle measurements, the output includes all of the measurement overhead; otherwise, only the cycles between adding the first
 // instruction of the benchmark to the IDQ, and retiring the last instruction of the benchmark are considered.
 int end_to_end = false;
@@ -121,11 +127,16 @@ size_t n_r14_segments = 0;
 
 // [ADDED]
 bool trace_ready = false;
-char inputs_buffer[4*1024*1024];
 static size_t inputs_size = 0;
 static size_t mem_size = 0;
 char mem_region[2*PAGE_SIZE];
 int n_rep = 0;
+
+char* inputs_buffer = NULL;
+static bool _is_receving_inputs = false; 
+static uint32_t _cursor = 0;
+static uint32_t _cursor_end = 0;
+bool inputs_ready = false;
 
 static char trace[MAX_INPUTS][MAX_LINE_LEN];
 
@@ -625,34 +636,122 @@ static ssize_t n_rep_store(struct kobject *kobj, struct kobj_attribute *attr, co
 }
 static struct kobj_attribute n_reps_attribute = __ATTR(n_rep, 0660, n_rep_show, n_rep_store);
 
-// [ADDED] used for transferring inputs from the python fuzzer to the kernel module
-static ssize_t inputs_read(struct file* file, struct kobject *kobj, struct bin_attribute *attr, 
-                    char *buf, loff_t pos, size_t count){   
-    if (pos >= inputs_size)
-        return 0;
+// // [ADDED] used for transferring inputs from the python fuzzer to the kernel module
+// static ssize_t inputs_read(struct file* file, struct kobject *kobj, struct bin_attribute *attr, 
+//                     char *buf, loff_t pos, size_t count){   
+//     if (pos >= inputs_size)
+//         return 0;
     
-    if (pos + count > inputs_size)
-        count = inputs_size - pos;
+//     if (pos + count > inputs_size)
+//         count = inputs_size - pos;
     
-    memcpy(buf, inputs_buffer + pos, count);
-    return count;
-}
+//     memcpy(buf, inputs_buffer + pos, count);
+//     return count;
+// }
 
-static ssize_t inputs_write(struct file* file, struct kobject *kobj, struct bin_attribute *attr, 
-                     char *buf, loff_t pos, size_t count){ 
-    if (pos + count >= sizeof(inputs_buffer)){
-        return -ENOSPC;
+// static ssize_t inputs_write(struct file* file, struct kobject *kobj, struct bin_attribute *attr, 
+//                      char *buf, loff_t pos, size_t count){ 
+    
+//     if (pos + count >= sizeof(inputs_buffer)){
+//         return -ENOSPC;
+//     }
+
+//     memcpy(inputs_buffer + pos, buf, count);
+//     inputs_size = max(inputs_size, pos + count);
+
+//     return count;
+// }
+// static struct bin_attribute inputs_bin_attribute = {.attr = {.name = "inputs", .mode=0666}, 
+//                                                     .size=1024*1024,
+//                                                 .read=inputs_read, 
+//                                                 .write=inputs_write};
+
+ssize_t parse_input_buffer(const char *buf, size_t count, bool *finished) {
+    ssize_t byte_id = 0;
+    *finished = false;
+
+    if (!_is_receving_inputs) {
+        if (count < sizeof(uint32_t))
+            return 0;  // Not enough data to parse header
+
+        uint32_t n_values;
+        memcpy(&n_values, buf, sizeof(uint32_t));
+        byte_id = sizeof(uint32_t);
+
+        if (n_values == 0 || n_values > 1<<20)
+            return -EINVAL;
+
+        SAFE_FREE(inputs_buffer);
+        inputs_buffer = vmalloc(sizeof(uint32_t) * n_values);
+        if (!inputs_buffer)
+            return -ENOMEM;
+
+        _cursor = 0;
+        _cursor_end = sizeof(uint32_t) * n_values;
+        _is_receving_inputs = true;
+
+        // If there's more data after the header, fall through and parse it
     }
 
-    memcpy(inputs_buffer + pos, buf, count);
-    inputs_size = max(inputs_size, pos + count);
+    // Phase 2: parse input data (starting from byte_id)
+    size_t remaining = _cursor_end - _cursor;
+    size_t available = count - byte_id;
+    size_t to_copy = (available < remaining) ? available : remaining;
 
-    return count;
+    memcpy(((char *)inputs_buffer) + _cursor, buf + byte_id, to_copy);
+    _cursor += to_copy;
+    byte_id += to_copy;
+
+    if (_cursor >= _cursor_end) {
+        _is_receving_inputs = false;
+        *finished = true;
+    }
+
+    return byte_id;
 }
-static struct bin_attribute inputs_bin_attribute = {.attr = {.name = "inputs", .mode=0666}, 
-                                                    .size=1024*1024,
-                                                .read=inputs_read, 
-                                                .write=inputs_write};
+
+static ssize_t inputs_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf,
+                            size_t count)
+{
+    bool finished = false;
+    ssize_t consumed_bytes = parse_input_buffer(buf, count, &finished);
+    inputs_ready = false;
+
+    if (finished) {
+        inputs_ready = true;
+    }
+    return consumed_bytes;
+}
+
+static ssize_t inputs_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+    // FIXME: not implemented yet. See Flavien's branch for a reference implementation
+     // Print the input values
+    ssize_t len = 0;
+    len += sprintf(buf + len, "inputs_buffer:\n");
+
+    size_t num_inputs = _cursor_end / sizeof(uint32_t);
+    for (size_t i = 0; i < num_inputs; ++i) {
+        // Avoid buffer overflow
+        if (len >= (PAGE_SIZE - 32))
+            break;
+
+        len += sprintf(buf + len, "[%zu] = %u\n", i, ((uint32_t *)inputs_buffer)[i]);
+    }
+    len += sprintf(buf + len, "CURSOR = %u, CUROSR_END = %u, IS_RECEVING_INPUTS = %d, INPUTS_READY = %d\n", _cursor, _cursor_end, 
+    _is_receving_inputs, inputs_ready);
+
+    return len;
+}
+
+static struct kobj_attribute inputs_attribute = {
+    .attr = {
+        .name = "inputs_buffer",
+        .mode = 0666,  // You are explicitly setting the "unsafe" permissions
+    },
+    .show  = inputs_show,
+    .store = inputs_store,
+};
 
 // Remove the old trace_show and trace_attribute
 // static ssize_t trace_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) { ... }
@@ -871,12 +970,9 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
         n_used_counters = 2;
         
     }
-    
-    // Prepare inputs for the benchmark code (num_inputs groups of random values to rax, rbx, rcx, rdx)
-    // The benchmark code will use these values as inputs for the benchmark code
-    // Inject the constant register inputs
+
+
     int32_t *regs = (int32_t *)inputs_buffer;
-    
     
     ENABLE_MWAIT(mwait_memory_area + MWAIT_MEMORY_OFFSET);
     // Repeat experiment n_inputs times
@@ -1340,12 +1436,13 @@ static int __init fuzzerBench_init(void) {
     error |= sysfs_create_file(fuzzerBench_kobj, &addresses_attribute.attr);
     error |= sysfs_create_file(fuzzerBench_kobj, &verbose_attribute.attr);
     // [ADDED] creating files for the new arguments "-num_inputs" and "-seed"
+    error |= sysfs_create_file(fuzzerBench_kobj, &inputs_attribute.attr);
     error |= sysfs_create_file(fuzzerBench_kobj, &num_inputs_attribute.attr);
     error |= sysfs_create_file(fuzzerBench_kobj, &seed_attribute.attr);
     error |= sysfs_create_file(fuzzerBench_kobj, &n_reps_attribute.attr);
     error |= sysfs_create_file(fuzzerBench_kobj, &cpu_attribute.attr);
     error |= sysfs_create_bin_file(fuzzerBench_kobj, &trace_bin_attribute);
-    error |= sysfs_create_bin_file(fuzzerBench_kobj, &inputs_bin_attribute);
+    // error |= sysfs_create_bin_file(fuzzerBench_kobj, &inputs_bin_attribute);
     error |= sysfs_create_bin_file(fuzzerBench_kobj, &mem_bin_attribute);
 
     if (error) {
