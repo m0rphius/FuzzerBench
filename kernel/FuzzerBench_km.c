@@ -970,12 +970,12 @@ static int run_FuzzerBench(struct seq_file *m, void *v) {
         n_used_counters = 2;
         
     }
-
-
+    
+    
     int32_t *regs = (int32_t *)inputs_buffer;
     
-    ENABLE_MWAIT(mwait_memory_area + MWAIT_MEMORY_OFFSET);
     // Repeat experiment n_inputs times
+    ENABLE_MWAIT(mwait_memory_area + MWAIT_MEMORY_OFFSET);
     for (int inp = 0; inp < warm_up_count + num_inputs; inp++){
         // Inject the changing register inputs 
         int group_ind = n_rep*(num_inputs + warm_up_count)*(NUM_VAR_REGS + NUM_MEM_REGS) + inp*(NUM_VAR_REGS + NUM_MEM_REGS);
